@@ -1,0 +1,4 @@
+interface:
+  display_name: "Extractory Commit Changes"
+  short_description: "Commit changes with repo rules"
+  default_prompt: "Use $extractory-commit-changes to create a compliant commit for the staged repository changes."

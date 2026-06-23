@@ -1,0 +1,139 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "extractory"
+version = "0.1.0"
+description = "Unofficial read-only extraction, normalization, graph, and analytics toolkit for Jira and Gerrit."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [
+  { name = "Extractory Maintainers" },
+]
+keywords = ["jira", "gerrit", "sdk", "analytics", "graph", "normalization"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = [
+  "httpx>=0.27,<1",
+  "pydantic>=2.6,<3",
+  "rich>=13,<15",
+  "typer>=0.12,<1",
+]
+
+[project.scripts]
+extractory = "extractory.cli:main"
+
+[dependency-groups]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+  "pytest-httpx>=0.30",
+  "ruff>=0.12",
+  "ty>=0.0.1a15",
+]
+docs = [
+  "sphinx>=9.1,<10",
+]
+
+[project.urls]
+Homepage = "https://gitlab.com/extractory/extractory"
+Documentation = "https://gitlab.com/extractory/extractory"
+Source = "https://gitlab.com/extractory/extractory"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/extractory"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/extractory/py.typed" = "extractory/py.typed"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/extractory",
+  "tests",
+  "docs",
+  "examples",
+  "scripts",
+  "README.md",
+  "CHANGELOG.md",
+  "LICENSE",
+  "AGENTS.md",
+  "pyproject.toml",
+  ".gitlab-ci.yml",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # API payloads and normalizer hooks intentionally accept arbitrary JSON values.
+  "ANN401",
+  # Typer CLI and graph-tool APIs intentionally expose boolean flags.
+  "FBT",
+  # Traversal and normalization dispatch functions are clearer when kept together.
+  "C901",
+  "PLR0911",
+  "PLR0912",
+  "PLR0915",
+  "PLC0415",
+  # Pydantic generic model syntax remains broadly compatible with current tooling.
+  "UP046",
+  # Conflicts with Ruff formatter's responsibility for trailing commas.
+  "COM812",
+  # Conflicts with D211; keep the no-blank-line convention.
+  "D203",
+  # Conflicts with D212; keep the first-line summary convention.
+  "D213",
+  # Magic methods are standard protocol hooks and are documented by their classes.
+  "D105",
+  # Constructor behavior is documented on classes to avoid duplicated docstrings.
+  "D107",
+  # Inline exception messages are clearer here than moving every message to a variable.
+  "EM",
+  # Conflicts with Ruff formatter's handling of implicit string concatenation.
+  "ISC001",
+  # SDK resource methods mirror upstream APIs and therefore have several query options.
+  "PLR0913",
+  # HTTP status codes are clearer at the call site for SDK error mapping.
+  "PLR2004",
+  # Runtime imports keep Pydantic public type surfaces easy to inspect.
+  "TC",
+  # SDK exceptions use precise messages near the failing branch.
+  "TRY003",
+  "TRY004",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"docs/conf.py" = ["A001", "D100", "INP001"]
+"examples/**/*.py" = ["D", "INP001", "T201"]
+"scripts/**/*.py" = ["D", "INP001", "T201"]
+"tests/**/*.py" = ["ANN", "ARG001", "D", "INP001", "S101", "S105", "S106", "SLF001"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+  "integration: tests that require external systems",
+  "live: tests that contact live Jira or Gerrit systems and are skipped by default",
+]
+
+[tool.ty.environment]
+python = "./.venv"
+python-version = "3.12"
