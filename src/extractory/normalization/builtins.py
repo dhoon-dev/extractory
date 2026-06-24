@@ -71,16 +71,16 @@ def _array_names(value: Any) -> list[str]:
 
 
 class IdentityNormalizer:
-    """Return a value unchanged under the requested column name."""
+    """Return a value unchanged under the requested output key."""
 
-    def __init__(self, column: str | None = None) -> None:
-        self.column = column
+    def __init__(self, output_key: str | None = None) -> None:
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize by preserving the original value."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         return FieldNormalizationResult(
-            columns={column: value},
+            outputs={output_key: value},
             raw_value=value,
             normalized=True,
         )
@@ -91,9 +91,9 @@ class StringNormalizer(IdentityNormalizer):
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a value to string."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         return FieldNormalizationResult(
-            columns={column: None if value is None else str(value)},
+            outputs={output_key: None if value is None else str(value)},
             raw_value=value,
             normalized=True,
         )
@@ -109,7 +109,7 @@ class DelimitedTextArrayNormalizer:
     def __init__(
         self,
         delimiter: str | None = None,
-        column: str | None = None,
+        output_key: str | None = None,
         *,
         regex: bool = False,
         strip: bool = True,
@@ -120,7 +120,7 @@ class DelimitedTextArrayNormalizer:
         if delimiter is None and regex:
             raise ValueError("regex delimiters require delimiter")
         self.delimiter = delimiter
-        self.column = column
+        self.output_key = output_key
         self.regex = regex
         self.strip = strip
         self.drop_empty = drop_empty
@@ -130,7 +130,7 @@ class DelimitedTextArrayNormalizer:
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize delimited text to a string array."""
-        column = self.column or context.field_alias or context.field_id or "values"
+        output_key = self.output_key or context.field_alias or context.field_id or "values"
         if value in (None, ""):
             values: list[str] = []
         else:
@@ -145,7 +145,7 @@ class DelimitedTextArrayNormalizer:
                 parts = [part.strip() for part in parts]
             values = [part for part in parts if part] if self.drop_empty else parts
         return FieldNormalizationResult(
-            columns={column: values},
+            outputs={output_key: values},
             raw_value=value,
             normalized=True,
         )
@@ -156,9 +156,11 @@ class NumberNormalizer(IdentityNormalizer):
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a value to float."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         parsed = None if value in (None, "") else float(value)
-        return FieldNormalizationResult(columns={column: parsed}, raw_value=value, normalized=True)
+        return FieldNormalizationResult(
+            outputs={output_key: parsed}, raw_value=value, normalized=True
+        )
 
 
 class BooleanNormalizer(IdentityNormalizer):
@@ -166,9 +168,9 @@ class BooleanNormalizer(IdentityNormalizer):
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a value to bool."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         return FieldNormalizationResult(
-            columns={column: None if value is None else bool(value)},
+            outputs={output_key: None if value is None else bool(value)},
             raw_value=value,
             normalized=True,
         )
@@ -179,9 +181,9 @@ class DateNormalizer(IdentityNormalizer):
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a value to date."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         return FieldNormalizationResult(
-            columns={column: parse_date(value)},
+            outputs={output_key: parse_date(value)},
             raw_value=value,
             normalized=True,
         )
@@ -192,9 +194,9 @@ class DatetimeNormalizer(IdentityNormalizer):
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a value to datetime."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         return FieldNormalizationResult(
-            columns={column: parse_datetime(value)},
+            outputs={output_key: parse_datetime(value)},
             raw_value=value,
             normalized=True,
         )
@@ -203,20 +205,22 @@ class DatetimeNormalizer(IdentityNormalizer):
 class JiraUserNormalizer:
     """Normalize Jira on-prem user objects."""
 
-    def __init__(self, prefix: str | None = None) -> None:
-        self.prefix = prefix
+    def __init__(self, *, output_key_prefix: str | None = None) -> None:
+        self.output_key_prefix = output_key_prefix
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
-        """Normalize user object columns."""
-        prefix = self.prefix or context.field_alias or context.field_id or "user"
+        """Normalize user object outputs."""
+        output_key_prefix = (
+            self.output_key_prefix or context.field_alias or context.field_id or "user"
+        )
         if not isinstance(value, dict):
             return FieldNormalizationResult(raw_value=value, normalized=False)
         return FieldNormalizationResult(
-            columns={
-                f"{prefix}_name": value.get("name"),
-                f"{prefix}_key": value.get("key"),
-                f"{prefix}_display_name": value.get("displayName"),
-                f"{prefix}_email": value.get("emailAddress"),
+            outputs={
+                f"{output_key_prefix}_name": value.get("name"),
+                f"{output_key_prefix}_key": value.get("key"),
+                f"{output_key_prefix}_display_name": value.get("displayName"),
+                f"{output_key_prefix}_email": value.get("emailAddress"),
             },
             raw_value=value,
             normalized=True,
@@ -226,29 +230,31 @@ class JiraUserNormalizer:
 class JiraUserArrayNormalizer:
     """Normalize arrays of Jira users."""
 
-    def __init__(self, column: str | None = None) -> None:
-        self.column = column
+    def __init__(self, output_key: str | None = None) -> None:
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize user arrays to display names."""
-        column = self.column or context.field_alias or context.field_id or "users"
+        output_key = self.output_key or context.field_alias or context.field_id or "users"
         users = value if isinstance(value, list) else []
         names = [user.get("displayName") for user in users if isinstance(user, dict)]
-        return FieldNormalizationResult(columns={column: names}, raw_value=value, normalized=True)
+        return FieldNormalizationResult(
+            outputs={output_key: names}, raw_value=value, normalized=True
+        )
 
 
 class NamedObjectNormalizer:
-    """Normalize a named object into name and id columns."""
+    """Normalize a named object into name and id outputs."""
 
-    def __init__(self, column: str | None = None) -> None:
-        self.column = column
+    def __init__(self, output_key: str | None = None) -> None:
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a Jira named object."""
-        column = self.column or context.field_alias or context.field_id or "value"
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
         name, identifier = _named(value)
         return FieldNormalizationResult(
-            columns={column: name, f"{column}_id": identifier},
+            outputs={output_key: name, f"{output_key}_id": identifier},
             raw_value=value,
             normalized=True,
         )
@@ -257,14 +263,14 @@ class NamedObjectNormalizer:
 class NamedArrayNormalizer:
     """Normalize an array of named objects to names."""
 
-    def __init__(self, column: str | None = None) -> None:
-        self.column = column
+    def __init__(self, output_key: str | None = None) -> None:
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize a named array."""
-        column = self.column or context.field_alias or context.field_id or "values"
+        output_key = self.output_key or context.field_alias or context.field_id or "values"
         return FieldNormalizationResult(
-            columns={column: _array_names(value)},
+            outputs={output_key: _array_names(value)},
             raw_value=value,
             normalized=True,
         )
@@ -281,15 +287,15 @@ class OptionArrayNormalizer(NamedArrayNormalizer):
 class LabelsNormalizer:
     """Normalize Jira labels."""
 
-    def __init__(self, column: str = "labels") -> None:
-        self.column = column
+    def __init__(self, output_key: str = "labels") -> None:
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize labels to strings."""
         del context
         labels = [str(item) for item in value] if isinstance(value, list) else []
         return FieldNormalizationResult(
-            columns={self.column: labels},
+            outputs={self.output_key: labels},
             raw_value=value,
             normalized=True,
         )
@@ -306,12 +312,12 @@ class ComponentArrayNormalizer(NamedArrayNormalizer):
 class CascadingSelectNormalizer:
     """Normalize Jira cascading select fields."""
 
-    def __init__(self, column: str | None = None) -> None:
-        self.column = column
+    def __init__(self, output_key: str | None = None) -> None:
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize parent and child option path."""
-        column = self.column or context.field_alias or context.field_id or "cascading"
+        output_key = self.output_key or context.field_alias or context.field_id or "cascading"
         if not isinstance(value, dict):
             return FieldNormalizationResult(raw_value=value, normalized=False)
         parent = value.get("value")
@@ -320,7 +326,11 @@ class CascadingSelectNormalizer:
         )
         path = [item for item in (parent, child) if item]
         return FieldNormalizationResult(
-            columns={f"{column}_parent": parent, f"{column}_child": child, f"{column}_path": path},
+            outputs={
+                f"{output_key}_parent": parent,
+                f"{output_key}_child": child,
+                f"{output_key}_path": path,
+            },
             raw_value=value,
             normalized=True,
         )
@@ -332,14 +342,14 @@ class JiraSprintNormalizer:
     def __init__(
         self,
         *,
-        names_column: str = "sprint_names",
-        active_names_column: str = "active_sprint_names",
-        latest_name_column: str = "latest_sprint_name",
+        sprint_names_output_key: str = "sprint_names",
+        active_sprint_names_output_key: str = "active_sprint_names",
+        latest_sprint_name_output_key: str = "latest_sprint_name",
         emit_child_records: bool = False,
     ) -> None:
-        self.names_column = names_column
-        self.active_names_column = active_names_column
-        self.latest_name_column = latest_name_column
+        self.sprint_names_output_key = sprint_names_output_key
+        self.active_sprint_names_output_key = active_sprint_names_output_key
+        self.latest_sprint_name_output_key = latest_sprint_name_output_key
         self.emit_child_records = emit_child_records
 
     def required_jira_fields(self) -> set[str]:
@@ -347,7 +357,7 @@ class JiraSprintNormalizer:
         return set()
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
-        """Normalize sprint strings or objects into analytics columns."""
+        """Normalize sprint strings or objects into analytics outputs."""
         del context
         items = value if isinstance(value, list) else ([] if value is None else [value])
         sprints = [self._parse_sprint(item) for item in items]
@@ -362,12 +372,12 @@ class JiraSprintNormalizer:
             if sprint.sprint_name is not None and (sprint.sprint_state or "").lower() == "active"
         ]
         return FieldNormalizationResult(
-            columns={
+            outputs={
                 "sprint_ids": sprint_ids,
-                self.names_column: sprint_names,
+                self.sprint_names_output_key: sprint_names,
                 "sprint_states": sprint_states,
-                self.active_names_column: active_names,
-                self.latest_name_column: sprint_names[-1] if sprint_names else None,
+                self.active_sprint_names_output_key: active_names,
+                self.latest_sprint_name_output_key: sprint_names[-1] if sprint_names else None,
             },
             child_records=sprints if self.emit_child_records else [],
             raw_value=value,
@@ -419,40 +429,47 @@ class RawJsonNormalizer:
 
 
 class RegexExtractNormalizer:
-    """Extract regex groups into columns."""
+    """Extract regex groups into outputs."""
 
-    def __init__(self, *, pattern: str, columns: dict[str, str]) -> None:
+    def __init__(
+        self,
+        *,
+        pattern: str,
+        numbered_group_output_keys: dict[int, str] | None = None,
+        named_group_output_keys: dict[str, str] | None = None,
+    ) -> None:
+        if not numbered_group_output_keys and not named_group_output_keys:
+            raise ValueError("at least one regex group mapping is required")
         self.pattern = re.compile(pattern)
-        self.columns = columns
+        self.numbered_group_output_keys = numbered_group_output_keys or {}
+        self.named_group_output_keys = named_group_output_keys or {}
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Extract regex matches from text."""
         del context
         text = "" if value is None else str(value)
         match = self.pattern.search(text)
-        columns: dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
         if match:
-            for source, target in self.columns.items():
-                if source.startswith("group_"):
-                    index = int(source.removeprefix("group_"))
-                    columns[target] = match.group(index)
-                else:
-                    columns[target] = match.group(source)
-        return FieldNormalizationResult(columns=columns, raw_value=value, normalized=bool(match))
+            for group_number, output_key in self.numbered_group_output_keys.items():
+                outputs[output_key] = match.group(group_number)
+            for group_name, output_key in self.named_group_output_keys.items():
+                outputs[output_key] = match.group(group_name)
+        return FieldNormalizationResult(outputs=outputs, raw_value=value, normalized=bool(match))
 
 
 class IssueKeyExtractNormalizer:
     """Extract issue keys from arbitrary text."""
 
-    def __init__(self, *, pattern: str, column: str = "issue_keys") -> None:
+    def __init__(self, *, pattern: str, output_key: str = "issue_keys") -> None:
         self.pattern = pattern
-        self.column = column
+        self.output_key = output_key
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Extract issue keys."""
         del context
         return FieldNormalizationResult(
-            columns={self.column: extract_issue_keys(value, pattern=self.pattern)},
+            outputs={self.output_key: extract_issue_keys(value, pattern=self.pattern)},
             raw_value=value,
             normalized=True,
         )
@@ -507,7 +524,7 @@ def generic_normalizer_for_schema(
     if context.schema_type == "datetime":
         return DatetimeNormalizer(context.field_alias)
     if context.schema_type == "user":
-        return JiraUserNormalizer(context.field_alias)
+        return JiraUserNormalizer(output_key_prefix=context.field_alias)
     if context.schema_type == "array" and context.schema_items in {
         "option",
         "version",

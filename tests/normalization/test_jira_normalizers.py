@@ -25,7 +25,7 @@ class WorkflowStatusNormalizer:
         del context
         status = value.get("name") if isinstance(value, dict) else value
         return FieldNormalizationResult(
-            columns={"workflow_status": None if status is None else str(status).lower()},
+            outputs={"workflow_status": None if status is None else str(status).lower()},
             raw_value=value,
             normalized=True,
         )
@@ -33,7 +33,7 @@ class WorkflowStatusNormalizer:
 
 def test_jira_custom_field_map_and_sprint_normalization() -> None:
     registry = FieldNormalizerRegistry()
-    registry.register_field_id("customfield_10016", NumberNormalizer(column="story_points"))
+    registry.register_field_id("customfield_10016", NumberNormalizer(output_key="story_points"))
     registry.register_field_id("customfield_10020", JiraSprintNormalizer(emit_child_records=True))
     issue = {
         "id": "10001",
@@ -118,7 +118,7 @@ def test_full_schema_dump_is_still_available_when_requested() -> None:
 
 def test_builtin_scalar_field_can_use_custom_normalizer() -> None:
     registry = FieldNormalizerRegistry()
-    registry.register_field_id("description", TextNormalizer(column="body"))
+    registry.register_field_id("description", TextNormalizer(output_key="body"))
     issue = {"key": "ABC-1", "fields": {"description": "Hello"}}
 
     result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
@@ -132,7 +132,7 @@ def test_delimited_text_array_normalizer_splits_text_value() -> None:
     registry = FieldNormalizerRegistry()
     registry.register_field_id(
         "customfield_10030",
-        DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+        DelimitedTextArrayNormalizer(delimiter=",", output_key="release_tags"),
     )
     issue = {"key": "ABC-1", "fields": {"customfield_10030": "alpha, beta,, gamma "}}
 
@@ -146,7 +146,7 @@ def test_delimited_text_array_normalizer_uses_whitespace_when_delimiter_is_omitt
     registry = FieldNormalizerRegistry()
     registry.register_field_id(
         "customfield_10030",
-        DelimitedTextArrayNormalizer(column="release_tags"),
+        DelimitedTextArrayNormalizer(output_key="release_tags"),
     )
     issue = {"key": "ABC-1", "fields": {"customfield_10030": " alpha  beta\tgamma\n delta "}}
 
@@ -162,7 +162,7 @@ def test_delimited_text_array_normalizer_can_use_regex_delimiter() -> None:
         "customfield_10030",
         DelimitedTextArrayNormalizer(
             delimiter=r"\s*[,;]\s*",
-            column="release_tags",
+            output_key="release_tags",
             regex=True,
         ),
     )
@@ -178,7 +178,7 @@ def test_delimited_text_array_normalizer_uses_literal_delimiters_by_default() ->
     registry = FieldNormalizerRegistry()
     registry.register_field_id(
         "customfield_10030",
-        DelimitedTextArrayNormalizer(delimiter=r"\s+", column="release_tags"),
+        DelimitedTextArrayNormalizer(delimiter=r"\s+", output_key="release_tags"),
     )
     issue = {"key": "ABC-1", "fields": {"customfield_10030": r"alpha\s+beta gamma"}}
 

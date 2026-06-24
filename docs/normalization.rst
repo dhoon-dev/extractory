@@ -20,8 +20,9 @@ Built-in Normalizers
 
 All built-in normalizers are importable from ``extractory.normalization`` and can be
 registered by field id, alias, field name, Jira schema, or Gerrit path. Most normalizers
-accept an optional ``column`` argument. When omitted, they use the field alias, then the
-source field id, then their documented fallback column.
+accept an optional ``output_key`` argument for the normalized record key they emit. When
+omitted, they use the field alias, then the source field id, then their documented
+fallback output key.
 
 .. code-block:: python
 
@@ -30,7 +31,7 @@ source field id, then their documented fallback column.
    registry = FieldNormalizerRegistry()
    registry.register_field_id(
        "customfield_10029",
-       DelimitedTextArrayNormalizer(column="release_tags"),
+       DelimitedTextArrayNormalizer(output_key="release_tags"),
    )
 
 When ``delimiter`` is omitted, ``DelimitedTextArrayNormalizer`` uses Python's built-in
@@ -41,7 +42,7 @@ on a literal string:
 
    registry.register_field_id(
        "customfield_10030",
-       DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+       DelimitedTextArrayNormalizer(delimiter=",", output_key="release_tags"),
    )
 
 Use ``regex=True`` only when ``delimiter`` should be interpreted as a Python regular
@@ -54,7 +55,7 @@ grouping is needed without including delimiter text in the result:
        "customfield_10031",
        DelimitedTextArrayNormalizer(
            delimiter=r"\s*[,;]\s*",
-           column="release_tags",
+           output_key="release_tags",
            regex=True,
        ),
    )
@@ -68,36 +69,37 @@ General scalar and array normalizers:
    * - Normalizer
      - Input
      - Output
-   * - ``IdentityNormalizer(column=None)``
+   * - ``IdentityNormalizer(output_key=None)``
      - Any value.
-     - Emits the value unchanged under ``column``. The fallback column is ``value``.
-   * - ``StringNormalizer(column=None)``
+     - Emits the value unchanged under ``output_key``. The fallback output key is
+       ``value``.
+   * - ``StringNormalizer(output_key=None)``
      - Any value.
      - Emits ``None`` for ``None``; otherwise emits ``str(value)``.
-   * - ``TextNormalizer(column=None)``
+   * - ``TextNormalizer(output_key=None)``
      - Any value.
      - Alias of ``StringNormalizer`` for larger text fields.
-   * - ``DelimitedTextArrayNormalizer(delimiter=None, column=None, regex=False, strip=True, drop_empty=True)``
+   * - ``DelimitedTextArrayNormalizer(delimiter=None, output_key=None, regex=False, strip=True, drop_empty=True)``
      - Text or any scalar value.
      - Splits ``str(value)`` into ``list[str]``. With ``delimiter=None``, it uses
        Python whitespace splitting. Otherwise, ``delimiter`` is a literal string unless
        ``regex=True`` enables Python ``re.split``. ``None`` and ``""`` become ``[]``.
        Empty delimiters are rejected, and invalid regex delimiters fail during normalizer
        construction.
-   * - ``NumberNormalizer(column=None)``
+   * - ``NumberNormalizer(output_key=None)``
      - Number-like scalar.
      - Emits ``float(value)``. ``None`` and ``""`` become ``None``; invalid values are
        handled by the configured normalization error policy.
-   * - ``BooleanNormalizer(column=None)``
+   * - ``BooleanNormalizer(output_key=None)``
      - Any value.
      - Emits ``None`` for ``None``; otherwise emits ``bool(value)``.
-   * - ``DateNormalizer(column=None)``
+   * - ``DateNormalizer(output_key=None)``
      - ISO date string or ``date``.
      - Emits a ``date`` when parsing succeeds, otherwise ``None``.
-   * - ``DatetimeNormalizer(column=None)``
+   * - ``DatetimeNormalizer(output_key=None)``
      - Jira, Gerrit, or ISO timestamp string, or ``datetime``.
      - Emits a timezone-aware ``datetime`` when parsing succeeds, otherwise ``None``.
-   * - ``LabelsNormalizer(column="labels")``
+   * - ``LabelsNormalizer(output_key="labels")``
      - Jira label array.
      - Emits a list of string labels. Non-list values become ``[]``.
 
@@ -110,28 +112,29 @@ Jira object and option normalizers:
    * - Normalizer
      - Input
      - Output
-   * - ``NamedObjectNormalizer(column=None)``
+   * - ``NamedObjectNormalizer(output_key=None)``
      - Object with ``name``, ``value``, or ``displayName`` and optional ``id`` or ``key``.
-     - Emits ``<column>`` and ``<column>_id``. Scalar values are stringified as the
+     - Emits ``<output_key>`` and ``<output_key>_id``. Scalar values are stringified as the
        display value with no id.
-   * - ``NamedArrayNormalizer(column=None)``
+   * - ``NamedArrayNormalizer(output_key=None)``
      - Array of named objects or scalars.
-     - Emits a list of display values. The fallback column is ``values``.
-   * - ``OptionNormalizer(column=None)``
+     - Emits a list of display values. The fallback output key is ``values``.
+   * - ``OptionNormalizer(output_key=None)``
      - Jira single-select option object.
      - Alias of ``NamedObjectNormalizer`` for option fields.
-   * - ``OptionArrayNormalizer(column=None)``
+   * - ``OptionArrayNormalizer(output_key=None)``
      - Jira multi-select option array.
      - Alias of ``NamedArrayNormalizer`` for option arrays.
-   * - ``VersionArrayNormalizer(column=None)``
+   * - ``VersionArrayNormalizer(output_key=None)``
      - Jira version object array.
      - Alias of ``NamedArrayNormalizer`` for version arrays.
-   * - ``ComponentArrayNormalizer(column=None)``
+   * - ``ComponentArrayNormalizer(output_key=None)``
      - Jira component object array.
      - Alias of ``NamedArrayNormalizer`` for component arrays.
-   * - ``CascadingSelectNormalizer(column=None)``
+   * - ``CascadingSelectNormalizer(output_key=None)``
      - Jira cascading select object with ``value`` and optional ``child.value``.
-     - Emits ``<column>_parent``, ``<column>_child``, and ``<column>_path``.
+     - Emits ``<output_key>_parent``, ``<output_key>_child``, and
+       ``<output_key>_path``.
 
 Jira user, sprint, and link normalizers:
 
@@ -142,21 +145,22 @@ Jira user, sprint, and link normalizers:
    * - Normalizer
      - Input
      - Output
-   * - ``JiraUserNormalizer(prefix=None)``
+   * - ``JiraUserNormalizer(output_key_prefix=None)``
      - Jira user object.
-     - Emits ``<prefix>_name``, ``<prefix>_key``, ``<prefix>_display_name``, and
-       ``<prefix>_email``. Non-object values are left unnormalized.
-   * - ``JiraUserArrayNormalizer(column=None)``
+     - Emits ``<output_key_prefix>_name``, ``<output_key_prefix>_key``,
+       ``<output_key_prefix>_display_name``, and ``<output_key_prefix>_email``.
+       Non-object values are left unnormalized.
+   * - ``JiraUserArrayNormalizer(output_key=None)``
      - Array of Jira user objects.
-     - Emits a list of ``displayName`` values. The fallback column is ``users``.
-   * - ``JiraSprintNormalizer(names_column="sprint_names", active_names_column="active_sprint_names", latest_name_column="latest_sprint_name", emit_child_records=False)``
+     - Emits a list of ``displayName`` values. The fallback output key is ``users``.
+   * - ``JiraSprintNormalizer(sprint_names_output_key="sprint_names", active_sprint_names_output_key="active_sprint_names", latest_sprint_name_output_key="latest_sprint_name", emit_child_records=False)``
      - Jira Agile sprint strings or sprint objects, either one value or an array.
-     - Emits ``sprint_ids``, ``sprint_states``, the configured name columns, and optional
-       ``JiraSprintRecord`` child records.
+     - Emits ``sprint_ids``, ``sprint_states``, the configured name output keys, and
+       optional ``JiraSprintRecord`` child records.
    * - ``JiraIssueLinksNormalizer()``
      - Jira ``issuelinks`` array.
      - Emits one ``JiraIssueLinkRecord`` child record for each inward or outward linked
-       issue. It does not emit columns.
+       issue. It does not emit normalized outputs.
 
 Raw and extraction normalizers:
 
@@ -171,11 +175,13 @@ Raw and extraction normalizers:
      - Any value.
      - Preserves the value in the record ``custom`` mapping under the field alias, field
        id, Gerrit path, or ``raw``.
-   * - ``RegexExtractNormalizer(pattern, columns)``
+   * - ``RegexExtractNormalizer(pattern, numbered_group_output_keys=None, named_group_output_keys=None)``
      - Text or any scalar value.
-     - Applies ``pattern`` and emits configured regex groups. Use ``group_1`` style keys
-       for numbered groups or group names for named groups.
-   * - ``IssueKeyExtractNormalizer(pattern, column="issue_keys")``
+     - Applies ``pattern`` and emits selected regex groups.
+       ``numbered_group_output_keys`` maps integer capture-group numbers to output
+       keys. ``named_group_output_keys`` maps named capture groups to output keys.
+       At least one mapping is required.
+   * - ``IssueKeyExtractNormalizer(pattern, output_key="issue_keys")``
      - Text or any scalar value.
      - Emits a list of issue keys found by ``extract_issue_keys`` using ``pattern``.
 

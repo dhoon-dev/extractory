@@ -105,7 +105,7 @@ def merge_value(
         target[final_key] = value
         return
     if policy == "raise":
-        raise ValueError(f"Conflicting normalized column: {final_key}")
+        raise ValueError(f"Conflicting normalized output key: {final_key}")
     if policy == "keep_first":
         return
     if policy == "keep_last":
@@ -141,7 +141,7 @@ def call_normalizer(
         )
         if error_policy == "null":
             return FieldNormalizationResult(
-                columns={context.field_alias or context.field_id or "value": None},
+                outputs={context.field_alias or context.field_id or "value": None},
                 warnings=[warning],
                 raw_value=value,
                 normalized=True,

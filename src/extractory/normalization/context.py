@@ -29,7 +29,7 @@ class FieldNormalizationContext(BaseModel):
 class FieldNormalizationResult(BaseModel):
     """Result returned by one field normalizer."""
 
-    columns: dict[str, Any] = Field(default_factory=dict)
+    outputs: dict[str, Any] = Field(default_factory=dict)
     custom: dict[str, Any] = Field(default_factory=dict)
     child_records: list[Any] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)

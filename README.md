@@ -100,7 +100,7 @@ from extractory.normalization import (
 
 def story_points(value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
     return FieldNormalizationResult(
-        columns={"story_points": None if value in (None, "") else float(value)},
+        outputs={"story_points": None if value in (None, "") else float(value)},
         raw_value=value,
         normalized=True,
     )
@@ -119,7 +119,7 @@ from extractory.normalization import DelimitedTextArrayNormalizer, FieldNormaliz
 registry = FieldNormalizerRegistry()
 registry.register_field_id(
     "customfield_10029",
-    DelimitedTextArrayNormalizer(column="release_tags"),
+    DelimitedTextArrayNormalizer(output_key="release_tags"),
 )
 ```
 
@@ -128,7 +128,7 @@ Pass `delimiter` to split on a literal string:
 ```python
 registry.register_field_id(
     "customfield_10030",
-    DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+    DelimitedTextArrayNormalizer(delimiter=",", output_key="release_tags"),
 )
 ```
 
@@ -140,7 +140,7 @@ registry.register_field_id(
     "customfield_10031",
     DelimitedTextArrayNormalizer(
         delimiter=r"\s*[,;]\s*",
-        column="release_tags",
+        output_key="release_tags",
         regex=True,
     ),
 )

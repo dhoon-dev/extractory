@@ -27,21 +27,21 @@ from extractory.normalization.registry import (
 from extractory.normalization.result import NormalizationResult
 
 
-def _account(prefix: str, value: Any) -> dict[str, Any]:
+def _account(output_key_prefix: str, value: Any) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         return {
-            f"{prefix}_account_id": None,
-            f"{prefix}_name": None,
-            f"{prefix}_display_name": None,
-            f"{prefix}_email": None,
-            f"{prefix}_username": None,
+            f"{output_key_prefix}_account_id": None,
+            f"{output_key_prefix}_name": None,
+            f"{output_key_prefix}_display_name": None,
+            f"{output_key_prefix}_email": None,
+            f"{output_key_prefix}_username": None,
         }
     return {
-        f"{prefix}_account_id": value.get("_account_id"),
-        f"{prefix}_name": value.get("name"),
-        f"{prefix}_display_name": value.get("display_name") or value.get("displayName"),
-        f"{prefix}_email": value.get("email"),
-        f"{prefix}_username": value.get("username"),
+        f"{output_key_prefix}_account_id": value.get("_account_id"),
+        f"{output_key_prefix}_name": value.get("name"),
+        f"{output_key_prefix}_display_name": value.get("display_name") or value.get("displayName"),
+        f"{output_key_prefix}_email": value.get("email"),
+        f"{output_key_prefix}_username": value.get("username"),
     }
 
 
@@ -145,8 +145,8 @@ def normalize_gerrit_change(
         result = call_normalizer(normalizer, value, context, error_policy=error_policy)
         warnings.extend(result.warnings)
         child_records.extend(result.child_records)
-        for key, column_value in result.columns.items():
-            merge_value(record_data, key, column_value, policy=conflict_policy)
+        for key, output_value in result.outputs.items():
+            merge_value(record_data, key, output_value, policy=conflict_policy)
         for key, custom_value in result.custom.items():
             merge_value(custom, key, custom_value, policy="namespace", namespace=".".join(path))
 

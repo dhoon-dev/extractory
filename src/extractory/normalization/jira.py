@@ -35,21 +35,21 @@ def _named(value: Any) -> tuple[str | None, str | None]:
     return None, None
 
 
-def _user_columns(prefix: str, value: Any) -> dict[str, Any]:
+def _user_outputs(output_key_prefix: str, value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         return {
-            prefix: None,
-            f"{prefix}_name": None,
-            f"{prefix}_key": None,
-            f"{prefix}_display_name": None,
-            f"{prefix}_email": None,
+            output_key_prefix: None,
+            f"{output_key_prefix}_name": None,
+            f"{output_key_prefix}_key": None,
+            f"{output_key_prefix}_display_name": None,
+            f"{output_key_prefix}_email": None,
         }
     return {
-        prefix: value.get("displayName") or value.get("name") or value.get("key"),
-        f"{prefix}_name": value.get("name"),
-        f"{prefix}_key": value.get("key"),
-        f"{prefix}_display_name": value.get("displayName"),
-        f"{prefix}_email": value.get("emailAddress"),
+        output_key_prefix: value.get("displayName") or value.get("name") or value.get("key"),
+        f"{output_key_prefix}_name": value.get("name"),
+        f"{output_key_prefix}_key": value.get("key"),
+        f"{output_key_prefix}_display_name": value.get("displayName"),
+        f"{output_key_prefix}_email": value.get("emailAddress"),
     }
 
 
@@ -90,12 +90,12 @@ class _JiraStandardFieldNormalizer:
         value: Any,
         context: FieldNormalizationContext,
     ) -> FieldNormalizationResult:
-        """Normalize a standard Jira field into Extractory's built-in columns."""
+        """Normalize a standard Jira field into Extractory's built-in output keys."""
         del context
-        columns: dict[str, Any] = {}
+        outputs: dict[str, Any] = {}
         match self.field_id:
             case "project":
-                columns.update(
+                outputs.update(
                     {
                         "project": value.get("name") if isinstance(value, Mapping) else None,
                         "project_id": value.get("id") if isinstance(value, Mapping) else None,
@@ -103,21 +103,21 @@ class _JiraStandardFieldNormalizer:
                     }
                 )
             case "issuetype":
-                columns.update(
+                outputs.update(
                     {
                         "issuetype": value.get("name") if isinstance(value, Mapping) else None,
                         "issuetype_id": value.get("id") if isinstance(value, Mapping) else None,
                     }
                 )
             case "summary":
-                columns["summary"] = value
+                outputs["summary"] = value
             case "description":
-                columns["description"] = value
+                outputs["description"] = value
             case "status":
                 status_category = (
                     value.get("statusCategory", {}) if isinstance(value, Mapping) else {}
                 )
-                columns.update(
+                outputs.update(
                     {
                         "status": value.get("name") if isinstance(value, Mapping) else None,
                         "status_id": value.get("id") if isinstance(value, Mapping) else None,
@@ -130,42 +130,42 @@ class _JiraStandardFieldNormalizer:
                     }
                 )
             case "priority":
-                columns.update(
+                outputs.update(
                     {
                         "priority": value.get("name") if isinstance(value, Mapping) else None,
                         "priority_id": value.get("id") if isinstance(value, Mapping) else None,
                     }
                 )
             case "resolution":
-                columns.update(
+                outputs.update(
                     {
                         "resolution": value.get("name") if isinstance(value, Mapping) else None,
                         "resolution_id": value.get("id") if isinstance(value, Mapping) else None,
                     }
                 )
             case "assignee" | "reporter" | "creator":
-                columns.update(_user_columns(self.field_id, value))
+                outputs.update(_user_outputs(self.field_id, value))
             case "labels":
-                columns["labels"] = (
+                outputs["labels"] = (
                     [str(label) for label in value] if isinstance(value, list) else []
                 )
             case "components":
-                columns["components"] = _names(value)
+                outputs["components"] = _names(value)
             case "fixVersions":
-                columns["fixVersions"] = _names(value)
+                outputs["fixVersions"] = _names(value)
             case "versions":
-                columns["versions"] = _names(value)
+                outputs["versions"] = _names(value)
             case "created":
-                columns["created"] = parse_datetime(value)
+                outputs["created"] = parse_datetime(value)
             case "updated":
-                columns["updated"] = parse_datetime(value)
+                outputs["updated"] = parse_datetime(value)
             case "resolutiondate":
-                columns["resolutiondate"] = parse_datetime(value)
+                outputs["resolutiondate"] = parse_datetime(value)
             case "duedate":
-                columns["duedate"] = parse_date(value)
+                outputs["duedate"] = parse_date(value)
             case _:
                 return FieldNormalizationResult(raw_value=value, normalized=False)
-        return FieldNormalizationResult(columns=columns, raw_value=value, normalized=True)
+        return FieldNormalizationResult(outputs=outputs, raw_value=value, normalized=True)
 
 
 def _default_normalizer_for_field(field_id: str) -> Any | None:
@@ -252,8 +252,8 @@ def normalize_jira_issue(
         result = call_normalizer(normalizer, value, context, error_policy=error_policy)
         warnings.extend(result.warnings)
         child_records.extend(result.child_records)
-        for key, column_value in result.columns.items():
-            merge_value(record_data, key, column_value, policy=conflict_policy)
+        for key, output_value in result.outputs.items():
+            merge_value(record_data, key, output_value, policy=conflict_policy)
         for key, custom_value in result.custom.items():
             merge_value(custom, key, custom_value, policy="namespace", namespace=field_id)
     if custom:
