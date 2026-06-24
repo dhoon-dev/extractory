@@ -105,7 +105,7 @@ class JiraIssueLinkRecord(AnalyticsRecord):
     """Normalized Jira issue link record."""
 
     source: Literal["jira"] = "jira"
-    issue_key: str
+    issue_key: str = ""
     linked_issue_key: str
     link_type: str | None = None
     direction: Literal["inward", "outward", "unknown"] = "unknown"

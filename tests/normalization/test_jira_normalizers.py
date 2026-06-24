@@ -9,6 +9,7 @@ from extractory.normalization import (
     FieldNormalizationContext,
     FieldNormalizationResult,
     FieldNormalizerRegistry,
+    JiraIssueLinksNormalizer,
     JiraSprintNormalizer,
     NumberNormalizer,
     TextNormalizer,
@@ -214,6 +215,79 @@ def test_builtin_object_field_can_use_custom_normalizer() -> None:
     assert dumped["workflow_status"] == "in progress"
     assert "status" not in dumped
     assert "status_id" not in dumped
+
+
+def test_jira_issue_links_normalizer_emits_default_child_record_fields() -> None:
+    link = {
+        "id": "90001",
+        "type": {"name": "Blocks", "outward": "blocks", "inward": "is blocked by"},
+        "outwardIssue": {
+            "id": "10002",
+            "key": "ABC-2",
+            "fields": {
+                "summary": "Dependency",
+                "status": {"name": "To Do"},
+            },
+        },
+    }
+    issue = {"key": "ABC-1", "fields": {"issuelinks": [link]}}
+
+    result = normalize_jira_issue(issue, include_raw=False)
+
+    assert len(result.child_records) == 1
+    assert result.child_records[0].model_dump() == {
+        "issue_key": "ABC-1",
+        "linked_issue_key": "ABC-2",
+        "link_type": "Blocks",
+        "direction": "outward",
+        "linked_issue_id": "10002",
+        "linked_issue_status": "To Do",
+        "linked_issue_summary": "Dependency",
+        "raw": link,
+    }
+
+
+def test_jira_issue_links_normalizer_can_limit_child_record_fields() -> None:
+    registry = FieldNormalizerRegistry()
+    registry.register_field_id(
+        "issuelinks",
+        JiraIssueLinksNormalizer(
+            include_fields=("linked_issue_key", "link_type", "direction"),
+            include_raw=False,
+        ),
+    )
+    issue = {
+        "key": "ABC-1",
+        "fields": {
+            "issuelinks": [
+                {
+                    "type": {"name": "Relates"},
+                    "inwardIssue": {
+                        "id": "10003",
+                        "key": "ABC-3",
+                        "fields": {
+                            "summary": "Related issue",
+                            "status": {"name": "Done"},
+                        },
+                    },
+                }
+            ]
+        },
+    }
+
+    result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
+
+    assert len(result.child_records) == 1
+    assert result.child_records[0].model_dump() == {
+        "linked_issue_key": "ABC-3",
+        "link_type": "Relates",
+        "direction": "inward",
+    }
+
+
+def test_jira_issue_links_normalizer_rejects_unknown_child_record_fields() -> None:
+    with pytest.raises(ValueError, match="unsupported Jira issue link field"):
+        JiraIssueLinksNormalizer(include_fields=("linked_issue_key", "bogus"))
 
 
 def test_standard_jira_fields_preserve_source_field_names() -> None:

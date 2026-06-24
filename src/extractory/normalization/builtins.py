@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from datetime import date, datetime
 from typing import Any
 
@@ -475,8 +476,67 @@ class IssueKeyExtractNormalizer:
         )
 
 
+_JIRA_ISSUE_LINK_FIELD_ORDER = (
+    "source",
+    "issue_key",
+    "linked_issue_key",
+    "link_type",
+    "direction",
+    "linked_issue_id",
+    "linked_issue_status",
+    "linked_issue_summary",
+    "raw",
+)
+_JIRA_ISSUE_LINK_DEFAULT_FIELDS = frozenset(
+    {
+        "issue_key",
+        "linked_issue_key",
+        "link_type",
+        "direction",
+        "linked_issue_id",
+        "linked_issue_status",
+        "linked_issue_summary",
+        "raw",
+    }
+)
+_JIRA_ISSUE_LINK_REQUIRED_FIELDS = frozenset({"linked_issue_key"})
+_JIRA_ISSUE_LINK_SUPPORTED_FIELDS = frozenset(_JIRA_ISSUE_LINK_FIELD_ORDER)
+
+
 class JiraIssueLinksNormalizer:
     """Normalize Jira issue links into child records."""
+
+    def __init__(
+        self,
+        include_fields: str | Iterable[str] | None = None,
+        *,
+        include_raw: bool | None = None,
+    ) -> None:
+        """Configure which ``JiraIssueLinkRecord`` fields are explicitly emitted.
+
+        ``linked_issue_key`` is always emitted because it identifies the target issue.
+        When ``include_fields`` is omitted, the normalizer keeps the historical default
+        shape, including the source ``issue_key``.
+        """
+        selected = set(_JIRA_ISSUE_LINK_DEFAULT_FIELDS)
+        if include_fields is not None:
+            selected = {include_fields} if isinstance(include_fields, str) else set(include_fields)
+
+        unknown = sorted(selected.difference(_JIRA_ISSUE_LINK_SUPPORTED_FIELDS))
+        if unknown:
+            supported = ", ".join(_JIRA_ISSUE_LINK_FIELD_ORDER)
+            raise ValueError(
+                f"unsupported Jira issue link field(s): {', '.join(unknown)}; "
+                f"supported fields: {supported}"
+            )
+
+        selected.update(_JIRA_ISSUE_LINK_REQUIRED_FIELDS)
+        if include_raw is True:
+            selected.add("raw")
+        elif include_raw is False:
+            selected.discard("raw")
+
+        self.include_fields = frozenset(selected)
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Emit Jira issue link child records."""
@@ -492,20 +552,26 @@ class JiraIssueLinksNormalizer:
                     continue
                 fields = linked.get("fields", {})
                 status = fields.get("status", {}) if isinstance(fields, dict) else {}
+                record_data = {
+                    "source": "jira",
+                    "issue_key": context.issue_key or "",
+                    "linked_issue_key": linked.get("key") or "",
+                    "link_type": link_type.get("name") if isinstance(link_type, dict) else None,
+                    "direction": direction,
+                    "linked_issue_id": linked.get("id"),
+                    "linked_issue_status": status.get("name") if isinstance(status, dict) else None,
+                    "linked_issue_summary": fields.get("summary")
+                    if isinstance(fields, dict)
+                    else None,
+                    "raw": link,
+                }
                 records.append(
-                    JiraIssueLinkRecord(
-                        issue_key=context.issue_key or "",
-                        linked_issue_key=linked.get("key") or "",
-                        link_type=link_type.get("name") if isinstance(link_type, dict) else None,
-                        direction=direction,
-                        linked_issue_id=linked.get("id"),
-                        linked_issue_status=status.get("name")
-                        if isinstance(status, dict)
-                        else None,
-                        linked_issue_summary=fields.get("summary")
-                        if isinstance(fields, dict)
-                        else None,
-                        raw=link,
+                    JiraIssueLinkRecord.model_validate(
+                        {
+                            field: record_data[field]
+                            for field in _JIRA_ISSUE_LINK_FIELD_ORDER
+                            if field in self.include_fields
+                        }
                     )
                 )
         return FieldNormalizationResult(child_records=records, raw_value=value, normalized=True)

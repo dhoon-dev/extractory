@@ -157,10 +157,16 @@ Jira user, sprint, and link normalizers:
      - Jira Agile sprint strings or sprint objects, either one value or an array.
      - Emits ``sprint_ids``, ``sprint_states``, the configured name output keys, and
        optional ``JiraSprintRecord`` child records.
-   * - ``JiraIssueLinksNormalizer()``
+   * - ``JiraIssueLinksNormalizer(include_fields=None, include_raw=None)``
      - Jira ``issuelinks`` array.
      - Emits one ``JiraIssueLinkRecord`` child record for each inward or outward linked
-       issue. It does not emit normalized outputs.
+       issue. It does not emit normalized outputs. ``include_fields`` may restrict child
+       record fields to ``source``, ``issue_key``, ``linked_issue_key``, ``link_type``,
+       ``direction``, ``linked_issue_id``, ``linked_issue_status``,
+       ``linked_issue_summary``, and ``raw``. ``linked_issue_key`` is always emitted.
+       The default field set includes ``issue_key`` for export-friendly relationship
+       rows, but explicit ``include_fields`` selections may omit it. ``include_raw=False``
+       removes ``raw`` from the child records.
 
 Raw and extraction normalizers:
 
