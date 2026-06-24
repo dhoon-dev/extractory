@@ -108,18 +108,25 @@ class DelimitedTextArrayNormalizer:
 
     def __init__(
         self,
-        delimiter: str,
+        delimiter: str | None = None,
         column: str | None = None,
         *,
+        regex: bool = False,
         strip: bool = True,
         drop_empty: bool = True,
     ) -> None:
         if delimiter == "":
             raise ValueError("delimiter must not be empty")
+        if delimiter is None and regex:
+            raise ValueError("regex delimiters require delimiter")
         self.delimiter = delimiter
         self.column = column
+        self.regex = regex
         self.strip = strip
         self.drop_empty = drop_empty
+        self._delimiter_pattern: re.Pattern[str] | None = (
+            re.compile(delimiter) if delimiter is not None and regex else None
+        )
 
     def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
         """Normalize delimited text to a string array."""
@@ -127,7 +134,13 @@ class DelimitedTextArrayNormalizer:
         if value in (None, ""):
             values: list[str] = []
         else:
-            parts = str(value).split(self.delimiter)
+            text = str(value)
+            if self.delimiter is None:
+                parts = text.split()
+            elif self._delimiter_pattern is not None:
+                parts = self._delimiter_pattern.split(text)
+            else:
+                parts = text.split(self.delimiter)
             if self.strip:
                 parts = [part.strip() for part in parts]
             values = [part for part in parts if part] if self.drop_empty else parts

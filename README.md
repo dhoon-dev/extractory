@@ -110,15 +110,39 @@ registry = FieldNormalizerRegistry()
 registry.register_field_id("customfield_10016", story_points)
 ```
 
-Delimited text fields can be normalized to arrays by registering a configured splitter:
+Delimited text fields can be normalized to arrays by registering a splitter. When
+`delimiter` is omitted, it uses Python's built-in whitespace splitting:
 
 ```python
 from extractory.normalization import DelimitedTextArrayNormalizer, FieldNormalizerRegistry
 
 registry = FieldNormalizerRegistry()
 registry.register_field_id(
+    "customfield_10029",
+    DelimitedTextArrayNormalizer(column="release_tags"),
+)
+```
+
+Pass `delimiter` to split on a literal string:
+
+```python
+registry.register_field_id(
     "customfield_10030",
     DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+)
+```
+
+The delimiter is literal by default. Set `regex=True` when a field needs a regular
+expression delimiter:
+
+```python
+registry.register_field_id(
+    "customfield_10031",
+    DelimitedTextArrayNormalizer(
+        delimiter=r"\s*[,;]\s*",
+        column="release_tags",
+        regex=True,
+    ),
 )
 ```
 

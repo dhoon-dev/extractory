@@ -29,8 +29,34 @@ source field id, then their documented fallback column.
 
    registry = FieldNormalizerRegistry()
    registry.register_field_id(
+       "customfield_10029",
+       DelimitedTextArrayNormalizer(column="release_tags"),
+   )
+
+When ``delimiter`` is omitted, ``DelimitedTextArrayNormalizer`` uses Python's built-in
+whitespace splitting, equivalent to ``str(value).split()``. Pass ``delimiter`` to split
+on a literal string:
+
+.. code-block:: python
+
+   registry.register_field_id(
        "customfield_10030",
        DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+   )
+
+Use ``regex=True`` only when ``delimiter`` should be interpreted as a Python regular
+expression. Regex mode uses ``re.split``; use non-capturing groups such as ``(?:...)`` if
+grouping is needed without including delimiter text in the result:
+
+.. code-block:: python
+
+   registry.register_field_id(
+       "customfield_10031",
+       DelimitedTextArrayNormalizer(
+           delimiter=r"\s*[,;]\s*",
+           column="release_tags",
+           regex=True,
+       ),
    )
 
 General scalar and array normalizers:
@@ -51,10 +77,13 @@ General scalar and array normalizers:
    * - ``TextNormalizer(column=None)``
      - Any value.
      - Alias of ``StringNormalizer`` for larger text fields.
-   * - ``DelimitedTextArrayNormalizer(delimiter, column=None, strip=True, drop_empty=True)``
+   * - ``DelimitedTextArrayNormalizer(delimiter=None, column=None, regex=False, strip=True, drop_empty=True)``
      - Text or any scalar value.
-     - Splits ``str(value)`` by ``delimiter`` into ``list[str]``. ``None`` and ``""``
-       become ``[]``. Empty delimiters are rejected.
+     - Splits ``str(value)`` into ``list[str]``. With ``delimiter=None``, it uses
+       Python whitespace splitting. Otherwise, ``delimiter`` is a literal string unless
+       ``regex=True`` enables Python ``re.split``. ``None`` and ``""`` become ``[]``.
+       Empty delimiters are rejected, and invalid regex delimiters fail during normalizer
+       construction.
    * - ``NumberNormalizer(column=None)``
      - Number-like scalar.
      - Emits ``float(value)``. ``None`` and ``""`` become ``None``; invalid values are

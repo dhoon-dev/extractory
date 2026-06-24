@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 import pytest
@@ -141,9 +142,65 @@ def test_delimited_text_array_normalizer_splits_text_value() -> None:
     assert dumped["release_tags"] == ["alpha", "beta", "gamma"]
 
 
+def test_delimited_text_array_normalizer_uses_whitespace_when_delimiter_is_omitted() -> None:
+    registry = FieldNormalizerRegistry()
+    registry.register_field_id(
+        "customfield_10030",
+        DelimitedTextArrayNormalizer(column="release_tags"),
+    )
+    issue = {"key": "ABC-1", "fields": {"customfield_10030": " alpha  beta\tgamma\n delta "}}
+
+    result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
+    dumped = result.record.model_dump()
+
+    assert dumped["release_tags"] == ["alpha", "beta", "gamma", "delta"]
+
+
+def test_delimited_text_array_normalizer_can_use_regex_delimiter() -> None:
+    registry = FieldNormalizerRegistry()
+    registry.register_field_id(
+        "customfield_10030",
+        DelimitedTextArrayNormalizer(
+            delimiter=r"\s*[,;]\s*",
+            column="release_tags",
+            regex=True,
+        ),
+    )
+    issue = {"key": "ABC-1", "fields": {"customfield_10030": "alpha, beta;gamma,, delta"}}
+
+    result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
+    dumped = result.record.model_dump()
+
+    assert dumped["release_tags"] == ["alpha", "beta", "gamma", "delta"]
+
+
+def test_delimited_text_array_normalizer_uses_literal_delimiters_by_default() -> None:
+    registry = FieldNormalizerRegistry()
+    registry.register_field_id(
+        "customfield_10030",
+        DelimitedTextArrayNormalizer(delimiter=r"\s+", column="release_tags"),
+    )
+    issue = {"key": "ABC-1", "fields": {"customfield_10030": r"alpha\s+beta gamma"}}
+
+    result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
+    dumped = result.record.model_dump()
+
+    assert dumped["release_tags"] == ["alpha", "beta gamma"]
+
+
 def test_delimited_text_array_normalizer_rejects_empty_delimiter() -> None:
     with pytest.raises(ValueError, match="delimiter"):
         DelimitedTextArrayNormalizer(delimiter="")
+
+
+def test_delimited_text_array_normalizer_rejects_regex_without_delimiter() -> None:
+    with pytest.raises(ValueError, match="regex delimiters require delimiter"):
+        DelimitedTextArrayNormalizer(regex=True)
+
+
+def test_delimited_text_array_normalizer_rejects_invalid_regex_delimiter() -> None:
+    with pytest.raises(re.error):
+        DelimitedTextArrayNormalizer(delimiter="[", regex=True)
 
 
 def test_builtin_object_field_can_use_custom_normalizer() -> None:
