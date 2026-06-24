@@ -3,6 +3,7 @@ image: ghcr.io/astral-sh/uv:python3.12-bookworm
 variables:
   UV_LINK_MODE: copy
   UV_CACHE_DIR: .uv-cache
+  GIT_DEPTH: "0"
 
 cache:
   key:
@@ -15,6 +16,16 @@ quality:
   stage: test
   script:
     - uv sync --locked --all-extras --group docs
+    - |
+      zero_sha=0000000000000000000000000000000000000000
+      if [ -n "${CI_MERGE_REQUEST_DIFF_BASE_SHA:-}" ]; then
+        commit_range="${CI_MERGE_REQUEST_DIFF_BASE_SHA}..${CI_COMMIT_SHA}"
+      elif [ -n "${CI_COMMIT_BEFORE_SHA:-}" ] && [ "$CI_COMMIT_BEFORE_SHA" != "$zero_sha" ]; then
+        commit_range="${CI_COMMIT_BEFORE_SHA}..${CI_COMMIT_SHA}"
+      else
+        commit_range="HEAD^..HEAD"
+      fi
+      uv run --locked python scripts/check_commit_messages.py --range "$commit_range"
     - uv run --locked ruff format --check .
     - uv run --locked ruff check .
     - uv run --locked ty check

@@ -33,6 +33,7 @@ Run focused checks first. Before broad handoff, run:
 
 ```bash
 uv sync --locked --all-extras --group docs
+uv run --locked python scripts/check_commit_messages.py --range origin/main..HEAD
 uv run --locked ruff format --check .
 uv run --locked ruff check .
 uv run --locked ty check
@@ -75,4 +76,5 @@ useful docstrings. Document read-only behavior and traversal cost warnings.
 ## Commit Messages
 
 Use the repo-local `$extractory-commit-changes` skill when commits are requested. Commit
-messages must use concise Conventional Commit style.
+messages must use concise Conventional Commit style enforced by
+`scripts/check_commit_messages.py`. Never bypass the commit hook with `--no-verify`.

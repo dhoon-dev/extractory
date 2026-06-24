@@ -17,7 +17,7 @@ git diff --name-status
 2. Stage only files related to the user's request. Do not stage unrelated
    user changes.
 
-3. Write a concise Conventional Commits message that follows this repo's rules:
+3. Write a Conventional Commits message that follows this repo's rules:
 
 - Allowed types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `ci`.
 - Title format: `<type>: <summary>` or `<type>(scope): <summary>`.
@@ -26,8 +26,8 @@ git diff --name-status
 - Body lines: 72 characters or fewer.
 - English only unless the user explicitly requests translation.
 
-4. Let any local `commit-msg` hook run. Never bypass hooks with `--no-verify`.
-   If a hook fails, fix the message and retry.
+4. Let the local `commit-msg` hook run. Never bypass it with `--no-verify`.
+   If the hook fails, fix the message and retry.
 
 5. After commit, verify:
 

@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+
+message_file=$1
+case "$message_file" in
+    /*) ;;
+    *) message_file="$PWD/$message_file" ;;
+esac
+
+repo_root=$(git rev-parse --show-toplevel)
+cd "$repo_root"
+
+if command -v uv >/dev/null 2>&1; then
+    exec uv run --locked python scripts/check_commit_messages.py --message-file "$message_file"
+fi
+
+exec python3 scripts/check_commit_messages.py --message-file "$message_file"
