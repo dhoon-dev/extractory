@@ -79,6 +79,10 @@ General scalar and array normalizers:
    * - ``TextNormalizer(output_key=None)``
      - Any value.
      - Alias of ``StringNormalizer`` for larger text fields.
+   * - ``HtmlToMarkdownNormalizer(output_key=None, encoding="utf-8")``
+     - HTML or other text-like values.
+     - Converts the value to Markdown with MarkItDown. ``None`` remains ``None`` and
+       ``""`` remains ``""``.
    * - ``DelimitedTextArrayNormalizer(delimiter=None, output_key=None, regex=False, strip=True, drop_empty=True)``
      - Text or any scalar value.
      - Splits ``str(value)`` into ``list[str]``. With ``delimiter=None``, it uses
@@ -167,6 +171,22 @@ Jira user, sprint, and link normalizers:
        The default field set includes ``issue_key`` for export-friendly relationship
        rows, but explicit ``include_fields`` selections may omit it. ``include_raw=False``
        removes ``raw`` from the child records.
+
+Use ``HtmlToMarkdownNormalizer`` when a Jira text field is stored as HTML and the normalized
+record will be sent to an LLM:
+
+.. code-block:: python
+
+   from extractory.normalization import (
+       FieldNormalizerRegistry,
+       HtmlToMarkdownNormalizer,
+       normalize_jira_issue,
+   )
+
+   registry = FieldNormalizerRegistry()
+   registry.register_field_id("description", HtmlToMarkdownNormalizer())
+
+   result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
 
 Raw and extraction normalizers:
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from datetime import date, datetime
+from importlib import import_module
 from typing import Any
 
 from extractory.correlation import extract_issue_keys
@@ -102,6 +103,58 @@ class StringNormalizer(IdentityNormalizer):
 
 class TextNormalizer(StringNormalizer):
     """Alias of string normalization for larger text fields."""
+
+
+class HtmlToMarkdownNormalizer:
+    """Convert HTML or other text-like values to Markdown."""
+
+    def __init__(self, output_key: str | None = None, *, encoding: str = "utf-8") -> None:
+        self.output_key = output_key
+        self.encoding = encoding
+        self._converter: Any | None = None
+
+    def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
+        """Normalize a text-like value to Markdown."""
+        output_key = self.output_key or context.field_alias or context.field_id or "value"
+        if value is None:
+            markdown = None
+        elif value == "":
+            markdown = ""
+        else:
+            result = self._get_converter().convert_string(self._text(value))
+            markdown = self._markdown_from_result(result)
+        return FieldNormalizationResult(
+            outputs={output_key: markdown},
+            raw_value=value,
+            normalized=True,
+        )
+
+    def _get_converter(self) -> Any:
+        if self._converter is None:
+            try:
+                module = import_module("markitdown.converters")
+            except ImportError as exc:
+                raise RuntimeError(
+                    "HtmlToMarkdownNormalizer requires the MarkItDown dependency."
+                ) from exc
+            self._converter = module.HtmlConverter()
+        return self._converter
+
+    def _text(self, value: Any) -> str:
+        if isinstance(value, bytes):
+            return value.decode(self.encoding)
+        if isinstance(value, bytearray):
+            return bytes(value).decode(self.encoding)
+        return str(value)
+
+    @staticmethod
+    def _markdown_from_result(result: Any) -> str:
+        text = getattr(result, "text_content", None)
+        if text is None:
+            text = getattr(result, "markdown", None)
+        if text is None:
+            raise TypeError("MarkItDown result must expose text_content or markdown")
+        return str(text)
 
 
 class DelimitedTextArrayNormalizer:

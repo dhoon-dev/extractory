@@ -1,4 +1,6 @@
 import re
+import sys
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
@@ -9,6 +11,7 @@ from extractory.normalization import (
     FieldNormalizationContext,
     FieldNormalizationResult,
     FieldNormalizerRegistry,
+    HtmlToMarkdownNormalizer,
     JiraIssueLinksNormalizer,
     JiraSprintNormalizer,
     NumberNormalizer,
@@ -127,6 +130,53 @@ def test_builtin_scalar_field_can_use_custom_normalizer() -> None:
 
     assert dumped["body"] == "Hello"
     assert "description" not in dumped
+
+
+def test_html_to_markdown_normalizer_converts_html_value(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+
+    class FakeHtmlConverter:
+        def convert_string(self, text: str) -> SimpleNamespace:
+            calls.append(text)
+            return SimpleNamespace(text_content="## Title\n\nBody")
+
+    module = ModuleType("markitdown")
+    converters_module = ModuleType("markitdown.converters")
+    converters_module.__dict__["HtmlConverter"] = FakeHtmlConverter
+    monkeypatch.setitem(sys.modules, "markitdown", module)
+    monkeypatch.setitem(sys.modules, "markitdown.converters", converters_module)
+    registry = FieldNormalizerRegistry()
+    registry.register_field_id("description", HtmlToMarkdownNormalizer())
+    issue = {"key": "ABC-1", "fields": {"description": "<h2>Title</h2><p>Body</p>"}}
+
+    result = normalize_jira_issue(issue, normalizers=registry, include_raw=False)
+    dumped = result.record.model_dump()
+
+    assert dumped["description"] == "## Title\n\nBody"
+    assert calls == ["<h2>Title</h2><p>Body</p>"]
+
+
+def test_html_to_markdown_normalizer_accepts_markdown_result_attribute(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeHtmlConverter:
+        def convert_string(self, text: str) -> SimpleNamespace:
+            assert text == "<p>Hello</p>"
+            return SimpleNamespace(markdown="Hello")
+
+    module = ModuleType("markitdown")
+    converters_module = ModuleType("markitdown.converters")
+    converters_module.__dict__["HtmlConverter"] = FakeHtmlConverter
+    monkeypatch.setitem(sys.modules, "markitdown", module)
+    monkeypatch.setitem(sys.modules, "markitdown.converters", converters_module)
+    normalizer = HtmlToMarkdownNormalizer(output_key="body")
+    context = FieldNormalizationContext(source="jira", entity_type="issue", field_id="description")
+
+    result = normalizer("<p>Hello</p>", context)
+
+    assert result.outputs == {"body": "Hello"}
 
 
 def test_delimited_text_array_normalizer_splits_text_value() -> None:
