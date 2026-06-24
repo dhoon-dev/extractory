@@ -15,9 +15,13 @@ fields such as ``summary``, ``description``, ``status``, and ``assignee`` have d
 normalizers, but an exact ``register_field_id(...)`` entry overrides the default in the
 same way it does for custom fields.
 
-Use ``DelimitedTextArrayNormalizer`` for text fields that encode multiple values in one
-string. The delimiter is explicit, and items are stripped with empty values dropped by
-default.
+Built-in Normalizers
+--------------------
+
+All built-in normalizers are importable from ``extractory.normalization`` and can be
+registered by field id, alias, field name, Jira schema, or Gerrit path. Most normalizers
+accept an optional ``column`` argument. When omitted, they use the field alias, then the
+source field id, then their documented fallback column.
 
 .. code-block:: python
 
@@ -28,6 +32,147 @@ default.
        "customfield_10030",
        DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
    )
+
+General scalar and array normalizers:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 28 44
+
+   * - Normalizer
+     - Input
+     - Output
+   * - ``IdentityNormalizer(column=None)``
+     - Any value.
+     - Emits the value unchanged under ``column``. The fallback column is ``value``.
+   * - ``StringNormalizer(column=None)``
+     - Any value.
+     - Emits ``None`` for ``None``; otherwise emits ``str(value)``.
+   * - ``TextNormalizer(column=None)``
+     - Any value.
+     - Alias of ``StringNormalizer`` for larger text fields.
+   * - ``DelimitedTextArrayNormalizer(delimiter, column=None, strip=True, drop_empty=True)``
+     - Text or any scalar value.
+     - Splits ``str(value)`` by ``delimiter`` into ``list[str]``. ``None`` and ``""``
+       become ``[]``. Empty delimiters are rejected.
+   * - ``NumberNormalizer(column=None)``
+     - Number-like scalar.
+     - Emits ``float(value)``. ``None`` and ``""`` become ``None``; invalid values are
+       handled by the configured normalization error policy.
+   * - ``BooleanNormalizer(column=None)``
+     - Any value.
+     - Emits ``None`` for ``None``; otherwise emits ``bool(value)``.
+   * - ``DateNormalizer(column=None)``
+     - ISO date string or ``date``.
+     - Emits a ``date`` when parsing succeeds, otherwise ``None``.
+   * - ``DatetimeNormalizer(column=None)``
+     - Jira, Gerrit, or ISO timestamp string, or ``datetime``.
+     - Emits a timezone-aware ``datetime`` when parsing succeeds, otherwise ``None``.
+   * - ``LabelsNormalizer(column="labels")``
+     - Jira label array.
+     - Emits a list of string labels. Non-list values become ``[]``.
+
+Jira object and option normalizers:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 28 44
+
+   * - Normalizer
+     - Input
+     - Output
+   * - ``NamedObjectNormalizer(column=None)``
+     - Object with ``name``, ``value``, or ``displayName`` and optional ``id`` or ``key``.
+     - Emits ``<column>`` and ``<column>_id``. Scalar values are stringified as the
+       display value with no id.
+   * - ``NamedArrayNormalizer(column=None)``
+     - Array of named objects or scalars.
+     - Emits a list of display values. The fallback column is ``values``.
+   * - ``OptionNormalizer(column=None)``
+     - Jira single-select option object.
+     - Alias of ``NamedObjectNormalizer`` for option fields.
+   * - ``OptionArrayNormalizer(column=None)``
+     - Jira multi-select option array.
+     - Alias of ``NamedArrayNormalizer`` for option arrays.
+   * - ``VersionArrayNormalizer(column=None)``
+     - Jira version object array.
+     - Alias of ``NamedArrayNormalizer`` for version arrays.
+   * - ``ComponentArrayNormalizer(column=None)``
+     - Jira component object array.
+     - Alias of ``NamedArrayNormalizer`` for component arrays.
+   * - ``CascadingSelectNormalizer(column=None)``
+     - Jira cascading select object with ``value`` and optional ``child.value``.
+     - Emits ``<column>_parent``, ``<column>_child``, and ``<column>_path``.
+
+Jira user, sprint, and link normalizers:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 28 44
+
+   * - Normalizer
+     - Input
+     - Output
+   * - ``JiraUserNormalizer(prefix=None)``
+     - Jira user object.
+     - Emits ``<prefix>_name``, ``<prefix>_key``, ``<prefix>_display_name``, and
+       ``<prefix>_email``. Non-object values are left unnormalized.
+   * - ``JiraUserArrayNormalizer(column=None)``
+     - Array of Jira user objects.
+     - Emits a list of ``displayName`` values. The fallback column is ``users``.
+   * - ``JiraSprintNormalizer(names_column="sprint_names", active_names_column="active_sprint_names", latest_name_column="latest_sprint_name", emit_child_records=False)``
+     - Jira Agile sprint strings or sprint objects, either one value or an array.
+     - Emits ``sprint_ids``, ``sprint_states``, the configured name columns, and optional
+       ``JiraSprintRecord`` child records.
+   * - ``JiraIssueLinksNormalizer()``
+     - Jira ``issuelinks`` array.
+     - Emits one ``JiraIssueLinkRecord`` child record for each inward or outward linked
+       issue. It does not emit columns.
+
+Raw and extraction normalizers:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 28 44
+
+   * - Normalizer
+     - Input
+     - Output
+   * - ``RawJsonNormalizer()``
+     - Any value.
+     - Preserves the value in the record ``custom`` mapping under the field alias, field
+       id, Gerrit path, or ``raw``.
+   * - ``RegexExtractNormalizer(pattern, columns)``
+     - Text or any scalar value.
+     - Applies ``pattern`` and emits configured regex groups. Use ``group_1`` style keys
+       for numbered groups or group names for named groups.
+   * - ``IssueKeyExtractNormalizer(pattern, column="issue_keys")``
+     - Text or any scalar value.
+     - Emits a list of issue keys found by ``extract_issue_keys`` using ``pattern``.
+
+When a Jira field catalog is available, Extractory can also select generic normalizers by
+Jira schema:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 36 64
+
+   * - Jira schema
+     - Generic normalizer
+   * - ``type: string``
+     - ``StringNormalizer``
+   * - ``type: number``
+     - ``NumberNormalizer``
+   * - ``type: date``
+     - ``DateNormalizer``
+   * - ``type: datetime``
+     - ``DatetimeNormalizer``
+   * - ``type: user``
+     - ``JiraUserNormalizer``
+   * - ``type: option``
+     - ``OptionNormalizer``
+   * - ``type: array`` with ``items: option``, ``version``, or ``component``
+     - ``NamedArrayNormalizer``
 
 Jira Issue Default Field Mapping
 --------------------------------
