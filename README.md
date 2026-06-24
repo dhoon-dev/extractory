@@ -185,7 +185,6 @@ extractory gerrit query \
   --option-preset standard \
   --format jsonl
 
-extractory tools jira graph ABC-123 --depth 2 --format json
 extractory tools gerrit graph 12345 --depth 1 --format mermaid
 ```
 

@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, deque
 from collections.abc import Iterable
 from datetime import UTC, datetime
+from typing import Any
 
 from extractory.jira.client import JiraClient
+from extractory.jira.models import JiraIssue
 from extractory.jira.records import JiraIssueRecord
 from extractory.normalization.jira import normalize_jira_issue
 from extractory.records import SummaryRecord
@@ -90,11 +92,24 @@ def build_issue_hierarchy(
     *,
     max_depth: int = 3,
 ) -> HierarchySummary:
-    """Build a compact hierarchy summary from a bounded graph crawl."""
-    from extractory.tools.jira_graph import JiraIssueGraphTool
-
-    graph = JiraIssueGraphTool(client).crawl_connected_issues([root_issue_key], max_depth=max_depth)
-    issues = [record for record in graph.records if isinstance(record, JiraIssueRecord)]
+    """Build a compact parent/subtask hierarchy summary."""
+    issues: list[JiraIssueRecord] = []
+    queue: deque[tuple[str, int]] = deque([(root_issue_key, 0)])
+    visited: set[str] = set()
+    while queue:
+        issue_key, depth = queue.popleft()
+        if issue_key in visited or depth > max_depth:
+            continue
+        visited.add(issue_key)
+        issue = client.issues.get(
+            issue_key,
+            fields=("summary", "status", "issuetype", "assignee", "parent", "subtasks"),
+        )
+        issues.append(normalize_jira_issue(issue.model_dump(by_alias=True)).record)
+        if depth >= max_depth:
+            continue
+        for subtask_key in _subtask_keys(issue):
+            queue.append((subtask_key, depth + 1))
     return _hierarchy_summary(issues)
 
 
@@ -123,6 +138,19 @@ def _hierarchy_summary(issues: Iterable[JiraIssueRecord]) -> HierarchySummary:
         status_counts=dict(status_counts),
         issue_type_counts=dict(issue_type_counts),
     )
+
+
+def _linked_issue_key(value: Any) -> str | None:
+    return (
+        value.get("key") if isinstance(value, dict) and isinstance(value.get("key"), str) else None
+    )
+
+
+def _subtask_keys(issue: JiraIssue) -> list[str]:
+    subtasks = issue.fields.get("subtasks", [])
+    if not isinstance(subtasks, list):
+        return []
+    return [key for subtask in subtasks if (key := _linked_issue_key(subtask))]
 
 
 def find_stale_issues(

@@ -21,7 +21,6 @@ from extractory.tools.gerrit_submission import (
     summarize_submitted_together,
     summarize_topic,
 )
-from extractory.tools.jira_graph import AsyncJiraIssueGraphTool, JiraIssueGraphTool
 from extractory.tools.jira_impact import check_dependency_closure
 from extractory.tools.jira_release import (
     build_epic_tree,
@@ -53,14 +52,12 @@ from extractory.tools.summaries import (
 
 __all__ = [
     "AsyncGerritChangeGraphTool",
-    "AsyncJiraIssueGraphTool",
     "DependencyClosureResult",
     "GerritChangeGraphTool",
     "GerritFileImpactRecord",
     "GerritReviewHealthRecord",
     "HierarchySummary",
     "IncludedInRecord",
-    "JiraIssueGraphTool",
     "ReleaseReadinessReport",
     "ReleaseSummary",
     "RiskSummary",

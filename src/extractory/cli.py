@@ -22,7 +22,6 @@ from extractory.normalization.gerrit import normalize_gerrit_change
 from extractory.normalization.jira import normalize_jira_issue
 from extractory.tools.cross_system import build_issue_change_graph, find_gerrit_changes_for_issue
 from extractory.tools.gerrit_graph import GerritChangeGraphTool
-from extractory.tools.jira_graph import JiraIssueGraphTool
 
 console = Console()
 err_console = Console(stderr=True)
@@ -31,14 +30,12 @@ app = typer.Typer(no_args_is_help=True, help="Extractory read-only Jira/Gerrit t
 jira_app = typer.Typer(no_args_is_help=True, help="Jira extraction commands.")
 gerrit_app = typer.Typer(no_args_is_help=True, help="Gerrit extraction commands.")
 tools_app = typer.Typer(no_args_is_help=True, help="Read-only analysis tools.")
-tools_jira_app = typer.Typer(no_args_is_help=True, help="Jira graph and impact tools.")
 tools_gerrit_app = typer.Typer(no_args_is_help=True, help="Gerrit graph and review tools.")
 tools_cross_app = typer.Typer(no_args_is_help=True, help="Cross-system Jira/Gerrit tools.")
 
 app.add_typer(jira_app, name="jira")
 app.add_typer(gerrit_app, name="gerrit")
 app.add_typer(tools_app, name="tools")
-tools_app.add_typer(tools_jira_app, name="jira")
 tools_app.add_typer(tools_gerrit_app, name="gerrit")
 tools_app.add_typer(tools_cross_app, name="cross")
 
@@ -450,45 +447,6 @@ def gerrit_change(
     with GerritClient(config) as client:
         change = client.changes.get(change_id, option_preset=option_preset)
         _write_output(normalize_gerrit_change(change.model_dump(by_alias=True)).record, fmt)
-
-
-@tools_jira_app.command("graph")
-def tools_jira_graph(
-    issue_key: Annotated[list[str], typer.Argument(help="Root issue key(s).")],
-    base_url: BaseUrl = None,
-    api_version: Annotated[str, typer.Option("--api-version")] = "2",
-    pat: Annotated[str | None, typer.Option("--pat")] = None,
-    username: Annotated[str | None, typer.Option("--username")] = None,
-    password: Annotated[str | None, typer.Option("--password")] = None,
-    method: Annotated[str, typer.Option("--method")] = "post",
-    page_size: PageSize = 100,
-    verify_ssl: VerifySsl = True,
-    depth: Depth = 1,
-    max_nodes: MaxNodes = 500,
-    max_edges: MaxEdges = 2000,
-    max_api_calls: MaxApiCalls = 1000,
-    fmt: JsonFormat = "json",
-) -> None:
-    """Crawl a bounded Jira issue graph."""
-    del max_api_calls
-    config = _jira_config(
-        base_url=base_url,
-        api_version=api_version,
-        pat=pat,
-        username=username,
-        password=password,
-        method=method,
-        page_size=page_size,
-        verify_ssl=verify_ssl,
-    )
-    with JiraClient(config) as client:
-        graph = JiraIssueGraphTool(client).crawl_connected_issues(
-            issue_key,
-            max_depth=depth,
-            max_nodes=max_nodes,
-            max_edges=max_edges,
-        )
-        _write_output(graph, fmt)
 
 
 @tools_gerrit_app.command("graph")

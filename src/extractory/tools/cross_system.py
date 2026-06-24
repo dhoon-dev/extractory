@@ -8,9 +8,9 @@ from extractory.correlation import correlate_issue_keys
 from extractory.gerrit.client import GerritClient
 from extractory.graph.models import GraphEdge, GraphNode, GraphResult
 from extractory.jira.client import JiraClient
+from extractory.normalization.jira import normalize_jira_issue
 from extractory.records import IssueChangeLinkRecord
 from extractory.tools.gerrit_graph import GerritChangeGraphTool
-from extractory.tools.jira_graph import JiraIssueGraphTool
 from extractory.tools.summaries import ReleaseReadinessReport, RiskSummary
 
 
@@ -55,14 +55,28 @@ def build_issue_change_graph(
 ) -> GraphResult:
     """Build a graph connecting Jira issues and Gerrit changes by issue keys."""
     graph = GraphResult(roots=[f"jira:{key}" for key in issue_keys])
+    del jira_depth
     if include_jira_links:
-        jira_graph = JiraIssueGraphTool(jira_client).crawl_connected_issues(
-            issue_keys, max_depth=jira_depth
-        )
-        graph.nodes.extend(jira_graph.nodes)
-        graph.edges.extend(jira_graph.edges)
-        graph.records.extend(jira_graph.records)
-        graph.warnings.extend(jira_graph.warnings)
+        for issue_key in issue_keys:
+            issue = jira_client.issues.get(issue_key, fields=("summary", "status"))
+            graph.stats.api_calls += 1
+            status = issue.fields.get("status", {})
+            graph.add_node(
+                GraphNode(
+                    id=f"jira:{issue.key}",
+                    kind="jira_issue",
+                    source="jira",
+                    key=issue.key,
+                    label=(
+                        issue.fields.get("summary")
+                        if isinstance(issue.fields.get("summary"), str)
+                        else issue.key
+                    ),
+                    attributes={"status": status.get("name") if isinstance(status, dict) else None},
+                    raw=issue.raw,
+                )
+            )
+            graph.records.append(normalize_jira_issue(issue.model_dump(by_alias=True)).record)
     links = find_gerrit_changes_for_issues(gerrit_client, issue_keys)
     change_numbers = [str(link.change_number) for link in links if link.change_number is not None]
     if include_gerrit_related and change_numbers:
