@@ -110,6 +110,18 @@ registry = FieldNormalizerRegistry()
 registry.register_field_id("customfield_10016", story_points)
 ```
 
+Delimited text fields can be normalized to arrays by registering a configured splitter:
+
+```python
+from extractory.normalization import DelimitedTextArrayNormalizer, FieldNormalizerRegistry
+
+registry = FieldNormalizerRegistry()
+registry.register_field_id(
+    "customfield_10030",
+    DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+)
+```
+
 Raw values are preserved when normalization fails unless you explicitly choose
 `error_policy="raise"`.
 

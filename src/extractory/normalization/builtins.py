@@ -103,6 +103,41 @@ class TextNormalizer(StringNormalizer):
     """Alias of string normalization for larger text fields."""
 
 
+class DelimitedTextArrayNormalizer:
+    """Split a text value into an array using a configured delimiter."""
+
+    def __init__(
+        self,
+        delimiter: str,
+        column: str | None = None,
+        *,
+        strip: bool = True,
+        drop_empty: bool = True,
+    ) -> None:
+        if delimiter == "":
+            raise ValueError("delimiter must not be empty")
+        self.delimiter = delimiter
+        self.column = column
+        self.strip = strip
+        self.drop_empty = drop_empty
+
+    def __call__(self, value: Any, context: FieldNormalizationContext) -> FieldNormalizationResult:
+        """Normalize delimited text to a string array."""
+        column = self.column or context.field_alias or context.field_id or "values"
+        if value in (None, ""):
+            values: list[str] = []
+        else:
+            parts = str(value).split(self.delimiter)
+            if self.strip:
+                parts = [part.strip() for part in parts]
+            values = [part for part in parts if part] if self.drop_empty else parts
+        return FieldNormalizationResult(
+            columns={column: values},
+            raw_value=value,
+            normalized=True,
+        )
+
+
 class NumberNormalizer(IdentityNormalizer):
     """Normalize a value to float."""
 

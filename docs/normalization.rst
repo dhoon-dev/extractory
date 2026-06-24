@@ -15,6 +15,20 @@ fields such as ``summary``, ``description``, ``status``, and ``assignee`` have d
 normalizers, but an exact ``register_field_id(...)`` entry overrides the default in the
 same way it does for custom fields.
 
+Use ``DelimitedTextArrayNormalizer`` for text fields that encode multiple values in one
+string. The delimiter is explicit, and items are stripped with empty values dropped by
+default.
+
+.. code-block:: python
+
+   from extractory.normalization import DelimitedTextArrayNormalizer, FieldNormalizerRegistry
+
+   registry = FieldNormalizerRegistry()
+   registry.register_field_id(
+       "customfield_10030",
+       DelimitedTextArrayNormalizer(delimiter=",", column="release_tags"),
+   )
+
 Jira Issue Default Field Mapping
 --------------------------------
 
